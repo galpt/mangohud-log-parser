@@ -1,8 +1,6 @@
 # mangohud-log-parser
 
-`mangohud-parser` turns the CSV logs of [MangoHud](https://github.com/flightlessmango/MangoHud) into PNG charts.
-
-MangoHud is a Vulkan and OpenGL overlay for Linux that can log every frame of a game to a CSV file, with the frame time and the CPU, GPU and memory readings of that moment. A typical use is to play the same scene once per CPU scheduler and compare the runs.
+`mangohud-parser` turns the CSV logs of [MangoHud](https://github.com/flightlessmango/MangoHud) into PNG charts. MangoHud is a Vulkan and OpenGL overlay for Linux that can log every frame of a game to a CSV file, with the frame time and the CPU, GPU and memory readings of that moment. A typical use is to play the same scene once per CPU scheduler and compare the runs.
 
 The parser reads several logs, one run each, and draws them side by side in the style of the figures of a paper: a bar chart per statistic, a timeline per column and the distribution of the frame times. It is strict. A line it does not understand is an error, since a skipped row would put a wrong number in a chart.
 
@@ -51,17 +49,15 @@ Without `-dataname`, each run is named after its file without `.csv`, and two fi
 mangohud-parser -dataname scx_example,EEVDF Game_2026-01-01_12-00-00.csv Game_2026-01-01_12-10-00.csv
 ```
 
-The flag has to come before the log files, and `--dataname` works as well. Names are case sensitive, so `EEVDF` and `eevdf` are two different names. These rules apply in this order:
+The flag has to come before the log files, and `--dataname` works as well. Names are case sensitive, so `EEVDF` and `eevdf` are two different names. To get the change chart, name the EEVDF run exactly `EEVDF`. That spelling, and only that one, makes it the baseline. These rules apply in this order:
 
 | Rule | What happens |
 |---|---|
 | The flag comes after a log file | An error, with exit status 2 |
 | The spaces around a name | Trimmed, so `scx_flow, EEVDF` works |
-| The name count differs from the log count | An error, with exit status 2 |
-| A name is empty, or two names are the same string | An error, with exit status 2 |
+| The name count differs from the log count | An error before any log is read, with exit status 2 |
+| A name is empty, or two names are the same string | An error before any log is read, with exit status 2 |
 | Anything else in a name | Kept exactly as typed |
-
-The names are checked before any log is read. To get the change chart, name the EEVDF run exactly `EEVDF`. That spelling, and only that one, makes it the baseline.
 
 ### Output
 
@@ -133,16 +129,14 @@ The statistics come in this order: Average FPS, 1% min FPS, 0.1% min FPS, 97% pe
 
 ### Frame time distribution
 
-Both images draw the frame times of each run from its full data, sorted, with nothing interpolated, smoothed or binned.
+Both images draw the full sorted frame times of each run, with nothing interpolated, smoothed or binned.
 
-| Image | X axis | How to read it |
+| Image | X axis | Y axis |
 |---|---|---|
-| `1-frametime-tail.png` | Share of frames at least this slow, log scale | At x % and y ms, the slowest x % of frames took y ms or longer |
-| `2-frametime-body.png` | Percentile, linear, up to the 99th | The frame time at percentile p, from the fastest frame |
+| `1-frametime-tail.png` | Share of frames at least this slow, log scale | Frame time, log if the slowest is 20 times the fastest or more |
+| `2-frametime-body.png` | Percentile, linear, up to the 99th | Frame time, linear |
 
-In the tail image the k-th slowest of N frames is drawn at `x = 100 × k / N`, with the 100 slowest frames all drawn and 100 ranks per decade beyond them. This is where stutter shows, and MangoHud's 1% and 0.1% min FPS are 1000 divided by the values near x = 1 and x = 0.1. The y axis turns logarithmic when the slowest frame is 20 times the fastest or more.
-
-The value at percentile p in the body image is the frame time at position `ceil(p × N / 100)` of the frame times sorted from the fastest, which is the inverse of the empirical distribution function. It is drawn every 0.1 percentile.
+In the tail image a point at x % and y ms means that the slowest x % of the frames took y ms or longer. The k-th slowest of N frames is drawn at `x = 100 × k / N`, with the 100 slowest frames all drawn and 100 ranks per decade beyond them. MangoHud's 1% and 0.1% min FPS are 1000 divided by the values near x = 1 and x = 0.1. In the body image the value at percentile p is the frame time at position `ceil(p × N / 100)` of the frame times sorted from the fastest, drawn every 0.1 percentile.
 
 ## The statistics
 
