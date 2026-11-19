@@ -174,7 +174,7 @@ var timelineNames = []string{
 }
 
 func wantPaths(eevdf bool) []string {
-	want := []string{"summary/runs.png"}
+	want := []string{"quick-summary.png", "summary/runs.png"}
 	names := slices.Clone(summaryNames)
 	if eevdf {
 		names = append(names, "change-vs-eevdf")
@@ -204,10 +204,10 @@ func TestNamesAreShownAsTyped(t *testing.T) {
 	names := []string{"scx_flow_5.2.28", "scx_mlfq_2.0.2", "EEVDF", "eevdf"}
 	figs := mustBuild(t, names...)
 	for _, f := range figs {
-		if f.Path == "summary/runs.png" {
+		if f.Path == "summary/runs.png" || f.Path == quickFile {
 			for _, n := range names {
 				if !strings.Contains(string(f.Option), `"`+n+`"`) {
-					t.Errorf("run table lacks %q", n)
+					t.Errorf("%s lacks %q", f.Path, n)
 				}
 			}
 			continue

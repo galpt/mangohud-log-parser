@@ -115,17 +115,105 @@ func (t *textBlock) paragraph(text string, size float64) {
 	t.y += float64(len(lines)) * lineHeight(size)
 }
 
+// table is a booktabs table of text cells. A header cell may hold several
+// lines, joined by "\n". bold, when given, parallels rows and marks the cells
+// drawn in the bold face, which the column widths account for.
+type table struct {
+	header []string
+	rows   [][]string
+	bold   [][]bool
+}
+
+func (tb table) isBold(row, col int) bool { return tb.bold != nil && tb.bold[row][col] }
+
+// widths returns the width of every column: its widest cell, the header in
+// bold, plus the padding between columns.
+func (tb table) widths(m Measure) []float64 {
+	w := make([]float64, len(tb.header))
+	for i, h := range tb.header {
+		for _, line := range strings.Split(h, "\n") {
+			w[i] = math.Max(w[i], m(line, bodySize, true))
+		}
+		for r, row := range tb.rows {
+			w[i] = math.Max(w[i], m(row[i], bodySize, tb.isBold(r, i)))
+		}
+		w[i] += tablePadX
+	}
+	return w
+}
+
+// page is an image made of text and rules alone, laid out top to bottom.
+type page struct {
+	chart *charts.HeatMap
+	miss  missing
+	text  *textBlock
+}
+
+// newPage starts a page of the given inner width with its title. A heat map
+// is the chart type that draws nothing by default, so only the titles and the
+// rules end up in the image.
+func newPage(title string, inner float64, m Measure) *page {
+	hm := charts.NewHeatMap()
+	hm.SetGlobalOptions(append(baseOptions(), hiddenAxes()...)...)
+	p := &page{chart: hm, text: &textBlock{m: m, width: inner}}
+	p.text.titles = append(p.text.titles, textAt(title, margin, titleTop, titleSize, true, ink))
+	p.text.y = titleTop + lineHeight(titleSize) + sectionGap
+	return p
+}
+
+// table draws tb with the column widths colW. It is a booktabs table: heavier
+// rules above and below, a light one under the header, and no vertical lines.
+// The header cells sit on the rule under them, so a label of several lines
+// grows the header upward and leaves the other labels beside its last line.
+func (p *page) table(tb table, colW []float64) {
+	t := p.text
+	tableW := 0.0
+	for _, w := range colW {
+		tableW += w
+	}
+	lines := 1
+	for _, h := range tb.header {
+		lines = max(lines, strings.Count(h, "\n")+1)
+	}
+	headH := tableRowH + float64(lines-1)*lineHeight(bodySize)
+	pad := (tableRowH - lineHeight(bodySize)) / 2
+
+	p.miss.graphic = append(p.miss.graphic, ruleLine(margin, t.y, margin+tableW, t.y, 1.5))
+	x := float64(margin)
+	for i, h := range tb.header {
+		top := t.y + headH - pad - float64(strings.Count(h, "\n")+1)*lineHeight(bodySize)
+		t.titles = append(t.titles, textAt(h, x, top, bodySize, true, ink))
+		x += colW[i]
+	}
+	t.y += headH
+	p.miss.graphic = append(p.miss.graphic, ruleLine(margin, t.y, margin+tableW, t.y, 0.8))
+	for r, row := range tb.rows {
+		x := float64(margin)
+		for i, text := range row {
+			t.titles = append(t.titles, textAt(text, x, t.y+pad, bodySize, tb.isBold(r, i), ink))
+			x += colW[i]
+		}
+		t.y += tableRowH
+	}
+	p.miss.graphic = append(p.miss.graphic, ruleLine(margin, t.y, margin+tableW, t.y, 1.5))
+}
+
+// finish encodes the page as a figure of the given size.
+func (p *page) finish(file string, width, height int) (Figure, error) {
+	p.miss.titles = p.text.titles
+	p.miss.yTick = opts.AxisTick{Show: opts.Bool(false)}
+	option, err := p.miss.apply(p.chart)
+	if err != nil {
+		return Figure{}, err
+	}
+	return Figure{Path: file, Width: width, Height: height, Option: option}, nil
+}
+
 // runsFigure lays out the run table and the notes, top to bottom.
 func runsFigure(set *compare.Set, m Measure) (Figure, error) {
 	header, rows := runTable(set)
-	colW := make([]float64, len(header))
-	for i, h := range header {
-		colW[i] = m(h, bodySize, true)
-		for _, r := range rows {
-			colW[i] = math.Max(colW[i], m(r[i], bodySize, false))
-		}
-		colW[i] += tablePadX
-	}
+	tb := table{header: header, rows: rows}
+	colW := tb.widths(m)
 	tableW := 0.0
 	for _, w := range colW {
 		tableW += w
@@ -137,36 +225,10 @@ func runsFigure(set *compare.Set, m Measure) (Figure, error) {
 		return Figure{}, fmt.Errorf("the run table needs an image %d px wide, more than the %d px that render allows", width, render.MaxSide)
 	}
 
-	// A heat map is the chart type that draws nothing by default, so only
-	// the titles and the rules end up in the image.
-	hm := charts.NewHeatMap()
-	hm.SetGlobalOptions(append(baseOptions(), hiddenAxes()...)...)
-	var miss missing
-	t := &textBlock{m: m, width: inner}
-	t.titles = append(t.titles, textAt(title, margin, titleTop, titleSize, true, ink))
-	t.y = titleTop + lineHeight(titleSize) + sectionGap
-
-	// A booktabs table: heavier rules above and below, a light one under the
-	// header, and no vertical lines.
-	miss.graphic = append(miss.graphic, ruleLine(margin, t.y, margin+tableW, t.y, 1.5))
-	for r := -1; r < len(rows); r++ {
-		cells, bold := header, true
-		if r >= 0 {
-			cells, bold = rows[r], false
-		}
-		x := float64(margin)
-		for i, text := range cells {
-			t.titles = append(t.titles, textAt(text, x, t.y+(tableRowH-lineHeight(bodySize))/2, bodySize, bold, ink))
-			x += colW[i]
-		}
-		t.y += tableRowH
-		if r == -1 {
-			miss.graphic = append(miss.graphic, ruleLine(margin, t.y, margin+tableW, t.y, 0.8))
-		}
-	}
-	miss.graphic = append(miss.graphic, ruleLine(margin, t.y, margin+tableW, t.y, 1.5))
+	p := newPage(title, inner, m)
+	p.table(tb, colW)
+	t := p.text
 	t.y += 2 * sectionGap
-
 	t.heading("Notes")
 	for _, n := range summaryNotes(set) {
 		t.paragraph(n, bodySize)
@@ -176,13 +238,7 @@ func runsFigure(set *compare.Set, m Measure) (Figure, error) {
 	if height > render.MaxSide {
 		return Figure{}, fmt.Errorf("the notes need an image %d px tall, more than the %d px that render allows", height, render.MaxSide)
 	}
-	miss.titles = t.titles
-	miss.yTick = opts.AxisTick{Show: opts.Bool(false)}
-	option, err := miss.apply(hm)
-	if err != nil {
-		return Figure{}, err
-	}
-	return Figure{Path: path.Join(summaryDir, "runs.png"), Width: width, Height: height, Option: option}, nil
+	return p.finish(path.Join(summaryDir, "runs.png"), width, height)
 }
 
 // hiddenAxes gives the default axes of a chart without a plot a grid that is

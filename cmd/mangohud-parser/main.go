@@ -5,8 +5,8 @@
 //
 // Each log is one run, usually one per CPU scheduler, and every run is drawn
 // side by side in the same images. The charts go into a new
-// charts-<timestamp> directory under the current one, with a summary, a
-// timeline and a distribution directory.
+// charts-<timestamp> directory under the current one, with a quick summary
+// image and a summary, a timeline and a distribution directory.
 package main
 
 import (
@@ -159,14 +159,15 @@ const renderWorkers = 3
 
 // writeFigures renders every figure into dir and returns the paths written,
 // in the order of figs. The directories are created first, in order, so that
-// the workers only ever write files. rd is used as one of the workers, and
-// the others are created here and closed again before it returns.
+// the workers only ever write files, and a figure at the top of dir needs no
+// directory. rd is used as one of the workers, and the others are created here
+// and closed again before it returns.
 func writeFigures(rd *render.Renderer, figs []figure.Figure, dir string) ([]string, error) {
 	paths := make([]string, len(figs))
 	made := map[string]bool{}
 	for i, f := range figs {
 		paths[i] = filepath.Join(dir, filepath.FromSlash(f.Path))
-		if sub := filepath.Dir(paths[i]); !made[sub] {
+		if sub := filepath.Dir(paths[i]); sub != dir && !made[sub] {
 			if err := os.Mkdir(sub, 0o755); err != nil {
 				return nil, err
 			}

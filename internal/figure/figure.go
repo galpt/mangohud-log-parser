@@ -4,13 +4,15 @@
 // Package figure turns a set of compared MangoHud logs into ECharts options
 // laid out like the figures of a paper, each with the pixel size it needs.
 //
-// The summary directory holds a table of the runs and one bar chart per
-// statistic, with one bar per run, and the changes against a run named EEVDF
-// when there is one. The timeline directory has one image per frame metric
-// with a line per run over the time of the run, and the distribution directory
-// shows how the frame times of each run are spread, with the slow tail drawn
-// so it can be read. Every image stands on its own with a title, a legend and
-// a caption, so it can be read at its own size and shown without the others.
+// The quick summary is one table of the main statistics of every run, saved at
+// the top of the output. The summary directory holds a table of the runs and
+// one bar chart per statistic, with one bar per run, and the changes against a
+// run named EEVDF when there is one. The timeline directory has one image per
+// frame metric with a line per run over the time of the run, and the
+// distribution directory shows how the frame times of each run are spread,
+// with the slow tail drawn so it can be read. Every image stands on its own
+// with a title, a caption and, for a plot, a legend, so it can be read at its
+// own size and shown without the others.
 // The options are built with go-echarts types, and the few things go-echarts
 // cannot express are added in one place (see missing). Every size is worked
 // out here from the content: text is measured with the same font the renderer
@@ -32,7 +34,7 @@ type Measure func(text string, sizePx float64, bold bool) float64
 
 // Figure is one image to render, Width by Height in layout px. Option is the
 // ECharts option as JSON. Path is where the image is meant to be saved,
-// relative to the output directory, with forward slashes and exactly one
+// relative to the output directory, with forward slashes and at most one
 // directory in front of the file name.
 type Figure struct {
 	Path          string
@@ -52,8 +54,8 @@ const (
 // It is compared byte for byte, so a run has to be named exactly EEVDF.
 const baselineLabel = "EEVDF"
 
-// Build makes every image of the set: the summary images first, then the
-// timelines, then the distributions. Each directory numbers its images in the
+// Build makes every image of the set: the quick summary first, then the
+// summary images, the timelines and the distributions. Each directory numbers its images in the
 // order they are returned.
 func Build(set *compare.Set, m Measure) ([]Figure, error) {
 	sources := sourceLines(set)
@@ -65,7 +67,11 @@ func Build(set *compare.Set, m Measure) ([]Figure, error) {
 		figs = append(figs, f)
 		return nil
 	}
-	f, err := runsFigure(set, m)
+	f, err := quickFigure(set, sources, m)
+	if err := add(f, err, "quick summary"); err != nil {
+		return nil, err
+	}
+	f, err = runsFigure(set, m)
 	if err := add(f, err, "run table"); err != nil {
 		return nil, err
 	}

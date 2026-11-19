@@ -164,7 +164,7 @@ func wantFiles(eevdf bool) []string {
 		"fps", "frametime", "cpu-load", "cpu-power", "gpu-load", "cpu-temp", "gpu-temp", "gpu-core-clock",
 		"gpu-mem-clock", "gpu-vram-used", "gpu-power", "ram-used", "swap-used", "process-rss", "cpu-mhz",
 	}
-	files := []string{"summary/runs.png"}
+	files := []string{"quick-summary.png", "summary/runs.png"}
 	for i, s := range summary {
 		files = append(files, fmt.Sprintf("summary/%02d-%s.png", i+1, s))
 	}
@@ -175,11 +175,14 @@ func wantFiles(eevdf bool) []string {
 }
 
 // treeOf is the tree that holds files, with each directory listed before
-// the files in it, as WalkDir gives it.
+// the files in it, as WalkDir gives it, and the file at the top among them.
 func treeOf(files []string) []string {
 	var out []string
-	for _, dir := range []string{"distribution/", "summary/", "timeline/"} {
+	for _, dir := range []string{"distribution/", "quick-summary.png", "summary/", "timeline/"} {
 		out = append(out, dir)
+		if !strings.HasSuffix(dir, "/") {
+			continue
+		}
 		var in []string
 		for _, f := range files {
 			if strings.HasPrefix(f, dir) {

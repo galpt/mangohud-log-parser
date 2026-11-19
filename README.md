@@ -63,6 +63,7 @@ The flag has to come before the log files, and `--dataname` works as well. Names
 
 ```
 charts-1795000000000000000/
+  quick-summary.png
   summary/
     runs.png
     01-average-fps.png
@@ -78,8 +79,9 @@ charts-1795000000000000000/
     2-frametime-body.png
 ```
 
-| Directory | Files | Shows |
+| Path | Files | Shows |
 |---|---|---|
+| `quick-summary.png` | One file, at the top | The main statistics of every run in one table |
 | `summary/` | `runs.png`, `NN-<statistic>.png`, `NN-change-vs-eevdf.png` | The runs, one statistic per image, the change against EEVDF |
 | `timeline/` | `NN-<column>.png` | One column of the logs over time |
 | `distribution/` | `1-frametime-tail.png`, `2-frametime-body.png` | How the frame times are spread |
@@ -108,6 +110,12 @@ A statistic or a column that a log does not have, as with logs of older MangoHud
 ## What the images show
 
 Each image stands on its own, with a title, a legend of the runs, one plot and a caption that says how the values were computed and which file each run came from. The PNG files have twice the pixels of the layout on each side, so text stays sharp when zoomed in and on high density screens.
+
+### Quick summary
+
+`quick-summary.png` is one table with a column per run and a row for each of Average FPS, 1% min FPS, 0.1% min FPS, 97% percentile FPS, and the average and the peak of the CPU clock, the GPU core clock, the CPU power and the GPU power. The numbers are those of the images in `summary/`, at the same precision. In each FPS row the best run is bold, and runs that show the same value are all bold.
+
+A run whose log lacks a column shows `n/a`. A row that no run has is left out, and the caption names it.
 
 ### Run table
 
